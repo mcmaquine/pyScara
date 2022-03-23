@@ -14,4 +14,25 @@ index = {
 
 class MR_JE_C:
     def __init__( self, **kwargs) -> None:
-        modbusTCP = self.get('modbusTCP', None)
+        self.cli = kwargs.get('cli', None)
+
+    def get_status_word(self):
+        result = self.read( index['MR_STATUS_WORD'] )
+        if result != None:
+            return result.registers[0]
+        else:
+            return None
+
+    def read(self, index ):
+        if self.cli != None:
+            if self.cli.is_socket_open():
+                print('entrou aqui')
+                return self.cli.read_holding_registers( index, 1, unit=255 )
+            else: #try to connect one time
+                self.cli.connect()
+                if self.cli.is_socket_open():
+                    return self.cli.read_holding_registers( index, 1, unit=255 )
+                else:
+                    return None
+        else:
+            return None
