@@ -121,15 +121,15 @@ class MR_JE_C:
 
 class PointTable():
     def __init__ ( self, **kwargs ):
-        self.point      =   kwargs.get('point')
-        self.n_entries = kwargs.get('n_entries')
-        self.point_data =   kwargs.get('point_data')
-        self.speed      =   kwargs.get('speed')
-        self.acceleration   =   kwargs.get('acceleration')
-        self.deceleration   =   kwargs.get('deceleration')
-        self.dwell      =   kwargs.get('dwell')
-        self.aux        =   kwargs.get('aux')
-        self.mcode      =   kwargs.get('mcode')
+        self.point      =   kwargs.get('point', 0)
+        self.n_entries = kwargs.get('n_entries', 0)
+        self.point_data =   kwargs.get('point_data', 0)
+        self.speed      =   kwargs.get('speed', 0)
+        self.acceleration   =   kwargs.get('acceleration', 0)
+        self.deceleration   =   kwargs.get('deceleration', 0)
+        self.dwell      =   kwargs.get('dwell', 0)
+        self.aux        =   kwargs.get('aux', 0)
+        self.mcode      =   kwargs.get('mcode', 0)
 
     #return all field in a list ready to write
     def get_list( self ):
