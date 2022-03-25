@@ -13,6 +13,29 @@ index = {
     'MR_HOMING_METHOD':          int(0x6098)
 }
 
+bits = {
+    'BIT_0'     :   0x1,
+    'BIT_1'     :   0x2,
+    'BIT_2'     :   0x4,
+    'BIT_3'     :   0x8,
+    'BIT_4'     :   0x10,
+    'BIT_5'     :   0x20,
+    'BIT_6'     :   0x40,
+    'BIT_7'     :   0x80,
+    'BIT_8'     :   0x100,
+    'BIT_9'     :   0x200,
+    'BIT_10'    :   0x400,
+    'BIT_11'    :   0x800,
+    'BIT_12'    :   0x1000,
+    'BIT_13'    :   0x2000,
+    'BIT_14'    :   0x4000,
+    'BIT_15'    :   0x8000,
+    'NYBLE_0'   :   0xF,
+    'NYBLE_1'   :   0xF0,
+    'NYBLE_2'   :   0xF00,
+    'NYBLE_3'   :   0xF000
+}
+
 class MR_JE_C:
     def __init__( self, **kwargs) -> None:
         self.cli = kwargs.get('cli', None)
@@ -23,3 +46,7 @@ class MR_JE_C:
             return result.registers[0]
         else:
             return None
+    
+    def is_servo_on( self ):
+        result = self.get_status_word()
+        pass

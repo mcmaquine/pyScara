@@ -18,3 +18,11 @@ def read ( ModbusTCPClient, index) -> int:
                 return None
     else:
         return None
+
+# set a bit (or bits) in a word
+def set_bit( word, *bits) -> int:
+    result = word
+    
+    for bit in bits:
+        result = result | bit
+    return result
