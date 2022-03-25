@@ -1,16 +1,23 @@
-from pymodbus.client.sync import ModbusTcpClient
+from ctypes import util
+from pymodbus.client.sync import *
 import utils
 
 index = {
-    'MR_POINT_TABLE_OFFSET':    int(0x2801),
-    'MR_TARGET_POINT_TABLE':    int(0x2D60),
-    'MR_ERROR_CODE':		    int(0x603F),
-    'MR_CONTROL_WORD':			int(0x6040),
-    'MR_STATUS_WORD':           int(0x6041),
-    'MR_MODE_OF_OPERATION':		int(0x6060),
-    'MR_MODES_OPERATION_DISPLAY':int(0x6061),
-    'MR_POSITION_ACTUAL_VALUE':	int(0x6064),
-    'MR_HOMING_METHOD':          int(0x6098)
+    'MR_POINT_TABLE_OFFSET':        0x2801,
+    'MR_TARGET_POINT_TABLE':        0x2D60,
+    'MR_ERROR_CODE':		        0x603F,
+    'MR_CONTROL_WORD':			    0x6040,
+    'MR_STATUS_WORD':               0x6041,
+    'MR_MODE_OF_OPERATION':		    0x6060,
+    'MR_MODES_OPERATION_DISPLAY':   0x6061,
+    'MR_POSITION_ACTUAL_VALUE':	    0x6064,
+    'MR_HOMING_METHOD':             0x6098
+}
+
+status = {
+    'MR_SWITHED_ON'         :   0x7,
+    'MR_READY_TO_SWITCH_ON' :   0x1,
+    'MR_WARNING'            :   0x80
 }
 
 bits = {
@@ -39,14 +46,121 @@ bits = {
 class MR_JE_C:
     def __init__( self, **kwargs) -> None:
         self.cli = kwargs.get('cli', None)
+        self.mode = None
 
     def get_status_word(self):
-        result = utils.read( self.cli, index['MR_STATUS_WORD'] )
+        result = utils.read( self.cli, index['MR_STATUS_WORD'], 1 )
+        if result != None:
+            return result.registers[0]
+        else:
+            return None
+        
+    def get_control_word( self, **kwargs ) -> None:
+        result = utils.read( self.cli, index['MR_CONTROL_WORD'], 1 )
         if result != None:
             return result.registers[0]
         else:
             return None
     
     def is_servo_on( self ):
-        result = self.get_status_word()
+        word = self.get_status_word()
+        if word == None:
+            return None
+        else:
+            if word & status['MR_SWITHED_ON'] == status['MR_SWITHED_ON']:
+                return True
+            else:
+                return False
+    
+    def servo_on( self ):
+        word = self.get_control_word()
+        word = utils.set_bit( word, bits['NYBLE_0'])
+        return utils.write( self.cli, index['MR_CONTROL_WORD'], word )
+
+    def servo_off( self ):
+        word = self.get_control_word()
+        word = utils.reset_bit( word, bits['NYBLE_0'])
+        return utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+    
+    def get_actual_position( self ):
+        words = utils.read( self.cli, index['MR_POSITION_ACTUAL_VALUE'], 2 )
+        if words != None:
+            position = words.registers[1]
+            position = position << 16
+            position = position | words.registers[0]
+            return position
+        else:
+            return None
+    
+    # get point table data
+    def get_pt_data( self, point ):
+        if point < 1 or point > 255:
+            return None
+
+        data = utils.read( self.cli, index['MR_POINT_TABLE_OFFSET'] + point - 1, 15)
+
+        if data != None:
+            point_table = PointTable()
+            point_table.n_entries   = data.registers[0]
+            point_table.point_data  = data.registers[1] | (data.registers[2] << 16)
+            point_table.speed       = data.registers[3] | (data.registers[4] << 16) 
+            point_table.acceleration    = data.registers[5] | (data.registers[6] << 16)
+            point_table.deceleration       = data.registers[7] | (data.registers[8] << 16)
+            point_table.dwell       = data.registers[9] | (data.registers[10] << 16)
+            point_table.aux         = data.registers[11] | (data.registers[12] << 16)
+            point_table.mcode       = data.registers[13] | (data.registers[14] << 16)
+
+            return point_table
+        else:
+            return None
+
+    def set_pt_data( self, Point):
         pass
+
+
+
+class PointTable():
+    def __init__ ( self, **kwargs ):
+        self.point      =   kwargs.get('point')
+        self.n_entries = kwargs.get('n_entries')
+        self.point_data =   kwargs.get('point_data')
+        self.speed      =   kwargs.get('speed')
+        self.acceleration   =   kwargs.get('acceleration')
+        self.deceleration   =   kwargs.get('deceleration')
+        self.dwell      =   kwargs.get('dwell')
+        self.aux        =   kwargs.get('aux')
+        self.mcode      =   kwargs.get('mcode')
+
+    #return all field in a list ready to write
+    def get_list( self ):
+        
+        data = list(15)
+        
+        data[0]   =   self.point
+        
+        data[1]   =   self.point_data & 0xFFFF
+        data[2]   =   self.point_data >> 16
+
+        data[3] = self.speed & 0x0000FFFF
+        data[4] = self.speed >> 16
+        
+        data[5] = self.acceleration & 0x0000FFFF
+        data[6] = self.acceleration >> 16
+        
+        data[7] = self.deceleration & 0x0000FFFF
+        data[8] = self.deceleration >> 16
+        
+        data[9] = self.dwell & 0x0000FFFF
+        data[10]= self.dwell >> 16
+        
+        data[11]= self.aux & 0x0000FFFF
+        data[12]= self.aux >> 16
+        
+        data[13]= self.mcode & 0x0000FFFF
+        data[14]= self.mcode >> 16
+        
+        return data
+
+
+
+

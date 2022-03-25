@@ -1,19 +1,21 @@
 from MR_JE_C import *
-from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.client.sync import *
 import utils
 
 def main():
-    #client = ModbusTcpClient('10.8.0.201')
-    #client.connect()
+    client = ModbusTcpClient('10.8.0.201')
+    client.connect()
 
-    #J1 = MR_JE_C( cli = client )
+    J1 = MR_JE_C( cli = client )
 
-    #utils.print_bits( J1.get_status_word() )
-    #result = client.read_holding_registers( index['MR_STATUS_WORD'], 1, unit=255)
-    #print( hex( result.registers[0] ))
-    #client.close()
+    point = 2
 
-    print( utils.set_bit( 0, bits['BIT_0'], bits['BIT_1'] ))
+    print( 'Angle: '+str(J1.get_pt_data(point).point_data) )
+    print( 'Speed: '+str(J1.get_pt_data(point).speed) )
+    print( 'Acc:   '+str(J1.get_pt_data(point).acceleration) )
+    print( 'Decel: '+str(J1.get_pt_data(point).deceleration) )
+
+    client.close()
 
 if __name__ == '__main__':
     main()
