@@ -3,15 +3,17 @@ from pymodbus.client.sync import *
 import utils
 
 index = {
-    'MR_POINT_TABLE_OFFSET':        0x2801,
-    'MR_TARGET_POINT_TABLE':        0x2D60,
-    'MR_ERROR_CODE':		        0x603F,
-    'MR_CONTROL_WORD':			    0x6040,
-    'MR_STATUS_WORD':               0x6041,
-    'MR_MODE_OF_OPERATION':		    0x6060,
+    'MR_DEVICE_INFO'            :   0x1018,
+    'MR_POINT_TABLE_OFFSET'     :   0x2801,
+    'MR_TARGET_POINT_TABLE'     :   0x2D60,
+    'MR_ERROR_CODE'             :   0x603F,
+    'MR_CONTROL_WORD'           :   0x6040,
+    'MR_STATUS_WORD'            :   0x6041,
+    'MR_MODE_OF_OPERATION'      :   0x6060,
     'MR_MODES_OPERATION_DISPLAY':   0x6061,
-    'MR_POSITION_ACTUAL_VALUE':	    0x6064,
-    'MR_HOMING_METHOD':             0x6098
+    'MR_POSITION_ACTUAL_VALUE'  :   0x6064,
+    'MR_GEAR_RATIO'             :   0x6091,
+    'MR_HOMING_METHOD'          :   0x6098
 }
 
 status = {
@@ -46,7 +48,21 @@ bits = {
 class MR_JE_C:
     def __init__( self, **kwargs) -> None:
         self.cli = kwargs.get('cli', None)
+        self.gear_ratio         =   0
+        self.gear_numerator     =   0
+        self.gear_denominator   =   0
         self.mode = None
+
+    def get_info(self):
+        data = utils.read( self.cli, index['MR_DEVICE_INFO'], 9)
+        if data != None:
+            print('Vendor ID        :'+str( hex(data.registers[1] | data.registers[2] << 16)) )
+            print('Product Code     :'+str( hex(data.registers[3] | data.registers[4] << 16)) )
+            print('Revision Number  :'+str( hex(data.registers[5] | data.registers[6] << 16)) )
+            print('Serial number    :'+str( hex(data.registers[7] | data.registers[8] << 16)) )
+        else:
+            print('No data - must check connection')
+
 
     def get_status_word(self):
         result = utils.read( self.cli, index['MR_STATUS_WORD'], 1 )
@@ -101,19 +117,31 @@ class MR_JE_C:
 
         if data != None:
             point_table = PointTable()
-            point_table.n_entries   = data.registers[0]
-            point_table.point_data  = data.registers[1] | (data.registers[2] << 16)
-            point_table.speed       = data.registers[3] | (data.registers[4] << 16) 
+            point_table.n_entries       = data.registers[0]
+            point_table.point_data      = data.registers[1] | (data.registers[2] << 16)
+            point_table.speed           = data.registers[3] | (data.registers[4] << 16) 
             point_table.acceleration    = data.registers[5] | (data.registers[6] << 16)
-            point_table.deceleration       = data.registers[7] | (data.registers[8] << 16)
-            point_table.dwell       = data.registers[9] | (data.registers[10] << 16)
-            point_table.aux         = data.registers[11] | (data.registers[12] << 16)
-            point_table.mcode       = data.registers[13] | (data.registers[14] << 16)
+            point_table.deceleration    = data.registers[7] | (data.registers[8] << 16)
+            point_table.dwell           = data.registers[9] | (data.registers[10] << 16)
+            point_table.aux             = data.registers[11] | (data.registers[12] << 16)
+            point_table.mcode           = data.registers[13] | (data.registers[14] << 16)
 
             return point_table
         else:
             return None
 
+    def get_eletronic_gear_ratio(self):
+        data = utils.read( self.cli, index['MR_GEAR_RATIO'], 5)
+        if ( data != None ):
+            self.gear_ratio         = data.registers[0]
+            self.gear_numerator     = data.registers[1] | data.registers[2] << 16
+            self.gear_denominator   = data.registers[3] | data.registers[4] << 16
+            
+            return [self.gear_ratio, self.gear_numerator, self.gear_denominator]
+        else:
+            return None
+
+    # precisa finalizar
     def set_pt_data( self, Point):
         pass
 

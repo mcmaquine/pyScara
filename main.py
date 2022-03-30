@@ -8,14 +8,7 @@ def main():
 
     J1 = MR_JE_C( cli = client )
 
-    point = 4
-
-    print( 'Angle: '+str(J1.get_pt_data(point).point_data) )
-    print( 'Speed: '+str(J1.get_pt_data(point).speed) )
-    print( 'Acc:   '+str(J1.get_pt_data(point).acceleration) )
-    print( 'Decel: '+str(J1.get_pt_data(point).deceleration) )
-
-    J1.servo_off()
+    print(J1.get_actual_position())
 
     client.close()
 
