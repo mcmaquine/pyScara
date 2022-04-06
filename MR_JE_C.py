@@ -1,4 +1,3 @@
-from ctypes import util
 from pymodbus.client.sync import *
 import utils
 
