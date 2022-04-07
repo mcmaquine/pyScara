@@ -1,4 +1,6 @@
 from pymodbus.client.sync import *
+from pymodbus.payload import BinaryPayloadDecoder
+from pymodbus.constants import Endian
 import utils
 
 modes = {
@@ -27,6 +29,14 @@ index = {
     'MR_POSITION_ACTUAL_VALUE': 0x6064,
     'MR_GEAR_RATIO': 0x6091,
     'MR_HOMING_METHOD': 0x6098
+}
+
+homing = {
+    'MR_HOME_INTERRUPTED' :	0x400,
+    'MR_ILA' : 0x800,
+    'MR_HOME_COMPLETED' : 0x1400, #bit 10 e 12
+    'MR_HOME_ERROR_SPEED' : 0x2000, #bit 13
+    'MR_HOME_ERROR_SPEED_0' : 0x2400 #bit 10 e 13
 }
 
 status = {
@@ -84,7 +94,7 @@ class MR_JE_C:
         else:
             return None
 
-    def get_control_word(self, **kwargs) -> int:
+    def get_control_word(self) -> int:
         result = utils.read(self.cli, index['MR_CONTROL_WORD'], 1)
         if result is not None:
             return result.registers[0]
@@ -111,12 +121,27 @@ class MR_JE_C:
         word = utils.reset_bit(word, bits['NYBLE_0'])
         return utils.write(self.cli, index['MR_CONTROL_WORD'], word)
 
+    def reset_bits( self, *bits):
+        word = self.get_control_word()
+
+        if word is not None:
+            for bit in bits:
+                word = utils.reset_bit(word, bit )
+
+            utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+
+    def set_bits( self, *bits):
+        word = self.get_control_word()
+
+        if word is not None:
+            word = utils.set_bit(word, bits)
+            utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+
     def get_actual_position(self):
         words = utils.read(self.cli, index['MR_POSITION_ACTUAL_VALUE'], 2)
         if words is not None:
-            position = words.registers[1]
-            position = position << 16
-            position = position | words.registers[0]
+            decode =  BinaryPayloadDecoder.fromRegisters(words.registers, byteorder=Endian.Big, wordorder=Endian.Little)
+            position = decode.decode_32bit_int()
             return position
         else:
             return None
@@ -130,6 +155,9 @@ class MR_JE_C:
 
         if data is not None:
             point_table = PointTable()
+
+
+
             point_table.n_entries = data.registers[0]
             point_table.point_data = data.registers[1] | (data.registers[2] << 16)
             point_table.speed = data.registers[3] | (data.registers[4] << 16)
@@ -166,12 +194,62 @@ class MR_JE_C:
             return False
 
     def get_mode( self ):
-        data = utils.read( self.cli, index['MR_MODES_OPERATION_DISPLAY'], 1 )
+        words = utils.read( self.cli, index['MR_MODES_OPERATION_DISPLAY'], 1 )
 
-        if data is not None:
-            return data.registers[0]
+        if words is not None:
+            decoded = BinaryPayloadDecoder.fromRegisters(words.registers, byteorder=Endian.Big, wordorder=Endian.Little)
+            dummy = decoded.skip_bytes(1) # jumbs first byte
+            mode = decoded.decode_8bit_int()
+
+            return mode
         else:
             return None
+
+    def home(self):
+        mode = self.get_mode()
+        if mode is None:
+            return False
+        elif mode is not modes['MR_HOME_MODE']:
+            self.set_mode( 'MR_HOME_MODE')
+        
+        status = self.get_control_word()
+        print('control word '+str( hex(status)))
+
+        status = utils.set_bit( status, bits['BIT_4'])
+        utils.write( self.cli, index['MR_CONTROL_WORD'], status)
+        print('Control Word '+str( hex(self.get_control_word())))
+
+        #send bit 4 set to start home
+                
+        status_word = self.get_status_word()
+
+        while True:
+            if ( status_word & homing['MR_HOME_COMPLETED'] ) is homing['MR_HOME_COMPLETED']:
+                retorno = True
+                break
+            
+            elif ( status_word & homing['MR_HOME_ERROR_SPEED_0']) is homing['MR_HOME_ERROR_SPEED_0'] or \
+                ( status_word & homing['MR_HOME_ERROR_SPEED']) is homing['MR_HOME_ERROR_SPEED'] or \
+                ( status_word & homing['MR_HOME_INTERRUPTED'] is homing['MR_HOME_INTERRUPTED']):
+                retorno = False
+                break
+
+            status_word = self.get_status_word()
+            print('status word'+ str(hex(status_word)))
+
+        status = self.get_control_word()
+        status = utils.reset_bit( status, bits['BIT_4'])
+        utils.write(self.cli, index['MR_CONTROL_WORD'], status)
+
+        return retorno
+
+    def reset( self ):
+        status = self.get_status_word()
+        if status is not None:
+            status = utils.set_bit(status, bits['BIT_7'])
+            utils.write( self.cli, index['MR_CONTROL_WORD'], status)
+            status = utils.reset_bit(status, bits['BIT_7'])
+            utils.write( self.cli, index['MR_CONTROL_WORD'], status)            
 
     # precisa finalizar
     def set_pt_data(self, Point):
