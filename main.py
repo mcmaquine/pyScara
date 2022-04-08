@@ -8,28 +8,22 @@ from pymodbus.compat import iteritems
 
 
 
-def main():
         
-    client = ModbusTcpClient('10.8.0.201')
-    client.connect()
+client = ModbusTcpClient('10.8.0.201')
+client2= ModbusTcpClient('10.8.2.202')
 
-    J1 = MR_JE_C( cli = client )
+client.connect()
+client2.connect()
 
-    print( 'status word '+ str( hex(J1.get_control_word())))
-    print( 'old control word '+ str(hex( J1.get_status_word()) ))
-    print('mode '+ str(J1.get_mode()))
+J1 = MR_JE_C( cli = client )
 
-    J1.servo_on()
+print( 'status word '+ str( hex(J1.get_status_word())))
+print( 'old control word '+ str(hex( J1.get_control_word()) ))
+print('mode '+ str(J1.get_mode()))
 
-    J1.reset()
-    J1.reset_bits(bits['BIT_4'])
+J1.reset()
 
-    print( 'old control word '+ str(hex( J1.get_status_word()) ))
+# J1.home()
 
-    J1.home()
-
-    client.close()
-
-
-if __name__ == '__main__':
-    main()
+client.close()
+client2.close()

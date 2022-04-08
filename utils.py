@@ -27,14 +27,14 @@ def write ( ModbusTCPClient, index, word):
     if ModbusTCPClient != None:
         if ModbusTCPClient.is_socket_open():
             
-            print('Word to be write '+str(word))
-            builder = BinaryPayloadBuilder(wordorder=Endian.Big, byteorder=Endian.Big)
-            builder.add_16bit_int(word)
-            payload = builder.to_registers()
+            #print('Word to be write '+str(word))
+            #builder = BinaryPayloadBuilder(wordorder=Endian.Big, byteorder=Endian.Big)
+            #builder.add_16bit_uint(word)
+            #payload = builder.to_registers()
 
-            print( 'Pyload to be written '+str(payload ))
+            #print( 'Pyload to be written '+str(payload ))
 
-            return ModbusTCPClient.write_registers( index, payload, unit=255 )
+            return ModbusTCPClient.write_registers( index, word, unit=255 )
         else:
             ModbusTCPClient.connect()
             if ModbusTCPClient.is_socket_open():

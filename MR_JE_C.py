@@ -65,7 +65,8 @@ bits = {
     'NYBLE_0': 0xF,
     'NYBLE_1': 0xF0,
     'NYBLE_2': 0xF00,
-    'NYBLE_3': 0xF000
+    'NYBLE_3': 0xF000,
+    'ALL': 0xFFFF
 }
 
 
@@ -106,7 +107,7 @@ class MR_JE_C:
         if word is None:
             return None
         else:
-            if word & status['MR_SWITHED_ON'] == status['MR_SWITHED_ON']:
+            if (word & status['MR_SWITCHED_ON']) == status['MR_SWITCHED_ON']:
                 return True
             else:
                 return False
@@ -122,20 +123,28 @@ class MR_JE_C:
         return utils.write(self.cli, index['MR_CONTROL_WORD'], word)
 
     def reset_bits( self, *bits):
-        word = self.get_control_word()
-
-        if word is not None:
-            for bit in bits:
-                word = utils.reset_bit(word, bit )
-
-            utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+        mask = 0
+        result = self.get_control_word()
+        print('Before reset: '+str(hex(result)))
+    
+        for bit in bits:
+            mask = mask | bit
+    
+        result = result & ~mask
+        print('After resets '+str(hex(result)))
+        utils.write( self.cli, index['MR_CONTROL_WORD'], result)
 
     def set_bits( self, *bits):
         word = self.get_control_word()
 
         if word is not None:
-            word = utils.set_bit(word, bits)
+            for bit in bits:
+                word = word | bit
+
             utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+            return True
+        else:
+            return False
 
     def get_actual_position(self):
         words = utils.read(self.cli, index['MR_POSITION_ACTUAL_VALUE'], 2)
@@ -211,13 +220,8 @@ class MR_JE_C:
             return False
         elif mode is not modes['MR_HOME_MODE']:
             self.set_mode( 'MR_HOME_MODE')
-        
-        status = self.get_control_word()
-        print('control word '+str( hex(status)))
 
-        status = utils.set_bit( status, bits['BIT_4'])
-        utils.write( self.cli, index['MR_CONTROL_WORD'], status)
-        print('Control Word '+str( hex(self.get_control_word())))
+        self.set_bits(bits['BIT_4'])
 
         #send bit 4 set to start home
                 
@@ -230,26 +234,24 @@ class MR_JE_C:
             
             elif ( status_word & homing['MR_HOME_ERROR_SPEED_0']) is homing['MR_HOME_ERROR_SPEED_0'] or \
                 ( status_word & homing['MR_HOME_ERROR_SPEED']) is homing['MR_HOME_ERROR_SPEED'] or \
-                ( status_word & homing['MR_HOME_INTERRUPTED'] is homing['MR_HOME_INTERRUPTED']):
+                ( status_word & homing['MR_HOME_INTERRUPTED']) is homing['MR_HOME_INTERRUPTED']:
                 retorno = False
                 break
 
             status_word = self.get_status_word()
             print('status word'+ str(hex(status_word)))
 
-        status = self.get_control_word()
-        status = utils.reset_bit( status, bits['BIT_4'])
-        utils.write(self.cli, index['MR_CONTROL_WORD'], status)
+        self.reset_bits( bits['BIT_4'])
 
         return retorno
 
     def reset( self ):
-        status = self.get_status_word()
+        status = self.get_control_word()
         if status is not None:
-            status = utils.set_bit(status, bits['BIT_7'])
-            utils.write( self.cli, index['MR_CONTROL_WORD'], status)
-            status = utils.reset_bit(status, bits['BIT_7'])
-            utils.write( self.cli, index['MR_CONTROL_WORD'], status)            
+            self.set_bits( bits['BIT_7'])
+            ret = self.get_control_word()
+            if ( ret & bits['BIT_7']) is bits['BIT_7']:
+                self.reset_bits( bits['BIT_7'])
 
     # precisa finalizar
     def set_pt_data(self, Point):
