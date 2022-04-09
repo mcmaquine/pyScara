@@ -69,17 +69,66 @@ bits = {
     'ALL': 0xFFFF
 }
 
+MR_DEVICE_INFO = 0x1018
+MR_POINT_TABLE_OFFSET = 0x2801
+MR_TARGET_POINT_TABLE = 0x2D60
+MR_ERROR_CODE = 0x603F
+MR_CONTROL_WORD = 0x6040
+MR_STATUS_WORD = 0x6041
+MR_MODE_OF_OPERATION = 0x6060
+MR_MODES_OPERATION_DISPLAY = 0x6061
+MR_POSITION_ACTUAL_VALUE = 0x6064
+MR_GEAR_RATIO = 0x6091
+MR_HOMING_METHOD = 0x6098
+
 
 class MR_JE_C:
-    def __init__(self, **kwargs) -> None:
-        self.cli = kwargs.get('cli', None)
+    def __init__(self, ip, port=502) -> None:
+        self.client = ModbusTcpClient(ip, port)
         self.gear_ratio = 0
         self.gear_numerator = 0
         self.gear_denominator = 0
         self.mode = None
+        self.open_com()
+
+    def open_com(self):
+    # Open modbus TCP communication
+        try:
+            if self.client.connect():
+                print('Connection Opened')
+            else:
+                print('Connection failed')
+        except Exception as e:
+            print('open_com exception: %s' % e)
+
+    def _read_float_register(self, address, count):
+        result = self.client.read_holding_registers(address, count)
+        value = BinaryPayloadDecoder.fromRegisters(result.registers,
+                                                   byteorder=Endian.Big,
+                                                   wordorder=Endian.Little).decode_32bit_float()
+        return ('%.3f' % value).rstrip('.')
+
+    def read(self,  read_index, count):
+        if self.cli is not None:
+            if self.cli.is_socket_open():
+                return self.cli.read_holding_registers(read_index, count, unit=255)
+            else:  # try to connect one time
+                self.cli.connect()
+                if self.cli.is_socket_open():
+                    return self.cli.read_holding_registers(read_index, count, unit=255)
+                else:
+                    return None
+        else:
+            return None
+
+    def write(self, write_index, word):
+        if self.cli.is_socket_open():
+            return self.cli.write_registers(write_index, word, unit=255)
+        else:
+            return None
 
     def get_info(self):
-        data = utils.read(self.cli, index['MR_DEVICE_INFO'], 9)
+        data = self.read(MR_DEVICE_INFO, 9)
         if data is not None:
             print('Vendor ID        :' + str(hex(data.registers[1] | data.registers[2] << 16)))
             print('Product Code     :' + str(hex(data.registers[3] | data.registers[4] << 16)))
@@ -89,14 +138,14 @@ class MR_JE_C:
             print('No data - must check connection')
 
     def get_status_word(self) -> int:
-        result = utils.read(self.cli, index['MR_STATUS_WORD'], 1)
+        result = self.cli.read(MR_STATUS_WORD, 1)
         if result is not None:
             return result.registers[0]
         else:
             return None
 
     def get_control_word(self) -> int:
-        result = utils.read(self.cli, index['MR_CONTROL_WORD'], 1)
+        result = self.cli.read(MR_CONTROL_WORD, 1)
         if result is not None:
             return result.registers[0]
         else:
@@ -115,12 +164,12 @@ class MR_JE_C:
     def servo_on(self):
         word = self.get_control_word()
         word = utils.set_bit(word, bits['NYBLE_0'])
-        return utils.write(self.cli, index['MR_CONTROL_WORD'], word)
+        return self.cli.write(MR_CONTROL_WORD, word)
 
     def servo_off(self):
         word = self.get_control_word()
         word = utils.reset_bit(word, bits['NYBLE_0'])
-        return utils.write(self.cli, index['MR_CONTROL_WORD'], word)
+        return self.cli.write(MR_CONTROL_WORD, word)
 
     def reset_bits( self, *bits):
         mask = 0
@@ -140,8 +189,7 @@ class MR_JE_C:
         if word is not None:
             for bit in bits:
                 word = word | bit
-
-            utils.write( self.cli, index['MR_CONTROL_WORD'], word)
+            self.cli.write(MR_CONTROL_WORD, word)
             return True
         else:
             return False
