@@ -3,20 +3,6 @@ from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
 from pymodbus.constants import Endian
 import utils
 
-modes = {
-    'MR_NO_MODE': 0,
-    'MR_PROFILE_POSITION_MODE': 1,
-    'MR_PROFILE_VELOCITY_MODE': 2,
-    'MR_PROFILE_TORQUE_MODE': 3,
-    'MR_HOME_MODE': 6,
-    'MR_POSITION_CONTROL_MODE': -20,
-    'MR_SPEED_CONTROL_MODE': -21,
-    'MR_TORQUE_CONTROL_MODE': -22,
-    'MR_JOG_MODE': -100,
-    'MR_POINT_TABLE_MODE': -101,
-    'MR_INDEXER_MODE': -103
-}
-
 homing = {
     'MR_HOME_INTERRUPTED': 0x400,
     'MR_ILA': 0x800,
@@ -24,13 +10,6 @@ homing = {
     'MR_HOME_ERROR_SPEED': 0x2000,  # bit 13
     'MR_HOME_ERROR_SPEED_0': 0x2400  # bit 10 e 13
 }
-
-status = {
-    'MR_SWITCHED_ON': 0x7,
-    'MR_READY_TO_SWITCH_ON': 0x1,
-    'MR_WARNING': 0x80
-}
-
 
 class MASK:
     BIT_0 = 0x0001
@@ -165,83 +144,15 @@ class SW_BITS:
     FOLLOW_ERROR = 13  # 0: No following error; 1: Following error
 
 
-class PointTable:
-    def __init__(self, **kwargs):
-        self.point = kwargs.get('point', 0)
-        self.n_entries = kwargs.get('n_entries', 0)
-        self.point_data = kwargs.get('point_data', 0)
-        self.speed = kwargs.get('speed', 0)
-        self.acceleration = kwargs.get('acceleration', 0)
-        self.deceleration = kwargs.get('deceleration', 0)
-        self.dwell = kwargs.get('dwell', 0)
-        self.aux = kwargs.get('aux', 0)
-        self.mcode = kwargs.get('mcode', 0)
-
-    # return all field in a list ready to write
-    def get_list(self):
-        data = list(15)
-
-        data[0] = self.point
-
-        data[1] = self.point_data & 0xFFFF
-        data[2] = self.point_data >> 16
-
-        data[3] = self.speed & 0x0000FFFF
-        data[4] = self.speed >> 16
-
-        data[5] = self.acceleration & 0x0000FFFF
-        data[6] = self.acceleration >> 16
-
-        data[7] = self.deceleration & 0x0000FFFF
-        data[8] = self.deceleration >> 16
-
-        data[9] = self.dwell & 0x0000FFFF
-        data[10] = self.dwell >> 16
-
-        data[11] = self.aux & 0x0000FFFF
-        data[12] = self.aux >> 16
-
-        data[13] = self.mcode & 0x0000FFFF
-        data[14] = self.mcode >> 16
-
-        return data
-
-
 class PointData:
-    def __init__(self):
-        self.n_entries = None
-        self.point_data = None
-        self.speed = None
-        self.acceleration = None
-        self.deceleration = None
-        self.dwell = None
-        self.aux = None
-        self.mcode = None
-
-    def decode_register(self, data):
-        value = BinaryPayloadDecoder.fromRegisters(data.registers,
-                                                   byteorder=Endian.Big,
-                                                   wordorder=Endian.Little)
-        self.n_entries = value.decode_16bit_int()
-        self.point_data = value.decode_32bit_uint()
-        self.speed = value.decode_16bit_uint()
-        self.acceleration = value.decode_16bit_uint()
-        self.deceleration = value.decode_16bit_uint()
-        self.dwell = value.decode_16bit_uint()
-        self.aux = value.decode_8bit_int()
-        self.mcode = value.decode_8bit_int()
-
-    def encode_register(self):
-        _payload = BinaryPayloadBuilder(byteorder=Endian.Big, wordorder=Endian.Little)
-        _payload.add_16bit_int(self.n_entries)
-        _payload.add_32bit_uint(self.point_data)
-        _payload.add_16bit_uint(self.speed)
-        _payload.add_16bit_uint(self.acceleration)
-        _payload.add_16bit_uint(self.deceleration)
-        _payload.add_16bit_uint(self.dwell)
-        _payload.add_8bit_uint(self.aux)
-        _payload.add_8bit_uint(self.mcode)
-        return _payload.to_registers()
+    n_entries = None
+    point_data = None     # Coordinate
+    speed = None
+    acceleration = None
+    deceleration = None
+    dwell = None
+    aux = None
+    mcode = None
 
 
 class MR_JE_C:
@@ -289,6 +200,33 @@ class MR_JE_C:
     def _write_register(self, address, value):
         result = self.client.write_registers(address, value, unit=255)
         return result
+
+    def _decode_register_to_point(self, data):
+        _decoder = BinaryPayloadDecoder.fromRegisters(data.registers,
+                                                      byteorder=Endian.Big,
+                                                      wordorder=Endian.Little)
+        point = PointData()
+        point.n_entries = _decoder.decode_16bit_int()
+        point.point_data = _decoder.decode_32bit_int()
+        point.speed = _decoder.decode_32bit_int()
+        point.acceleration = _decoder.decode_32bit_int()
+        point.deceleration = _decoder.decode_32bit_int()
+        point.dwell = _decoder.decode_32bit_int()
+        point.aux = _decoder.decode_32bit_int()
+        point.mcode = _decoder.decode_32bit_int()
+        return point
+
+    def _encode_point_to_register(self, point):
+        _payload = BinaryPayloadBuilder(byteorder=Endian.Big, wordorder=Endian.Little)
+        _payload.add_16bit_uint(point.n_entries)
+        _payload.add_32bit_int(point.point_data)
+        _payload.add_32bit_int(point.speed)
+        _payload.add_32bit_int(point.acceleration)
+        _payload.add_32bit_int(point.deceleration)
+        _payload.add_32bit_int(point.dwell)
+        _payload.add_32bit_int(point.aux)
+        _payload.add_32bit_int(point.mcode)
+        return _payload.to_registers()
 
     def get_info(self):
         data = self.client.read_holding_registers(MB_REG.DEVICE_INFO, 9, unit=255)
@@ -373,44 +311,42 @@ class MR_JE_C:
         else:
             return None
 
-    def get_point_data(self, point):
+    def get_point_data(self, point_numb):
         # get point table data
-        point_data = PointData()
-        if point < 0 or point > 255:
+        point = PointData()
+        if point_numb < 0 or point_numb > 255:
             return None
-        data = self.client.read_holding_registers(MB_REG.POINT_TABLE_OFFSET + point, 9, unit=255)
-        print(data.registers)
+        try:
+            data = self.client.read_holding_registers(MB_REG.POINT_TABLE_OFFSET + point_numb, 15, unit=255)
+            print("get_poit_data {}: {}".format(point_numb, data.registers))
+        except Exception as e:
+            print('get_point_data exception: %s' % e)
 
         if data is not None:
-            point_data.decode_register(data)
-            print(point_data.n_entries)
-            print(point_data.point_data)
-            print(point_data.speed)
-            print(point_data.acceleration)
-            print(point_data.deceleration)
-            print(point_data.dwell)
-            print(point_data.aux)
-            print(point_data.mcode)
-
-    def set_point_data(self, point):
-        # Set point table data
-        point_data = PointData()
-        if point < 0 or point > 255:
+            point = self._decode_register_to_point(data)
+            return point
+        else:
             return None
-        point_data.n_entries = 7
-        point_data.point_data = 10000
-        point_data.speed = 100
-        point_data.acceleration = 200
-        point_data.deceleration = 0
-        point_data.dwell = 0
-        point_data.aux = 0
-        point_data.mcode = 0
 
-        payload = point_data.encode_register()
-        print(payload)
-        result = self.client.write_registers(MB_REG.POINT_TABLE_OFFSET + point, payload, unit=255)
-        print(result)
-
+    def set_point_data(self, point_numb, cord, speed, accel, decel):
+        # Set point table data
+        point = PointData()
+        if point_numb < 0 or point_numb > 255:
+            return None
+        point.n_entries = 7
+        point.point_data = cord
+        point.speed = speed
+        point.acceleration = accel
+        point.deceleration = decel
+        point.dwell = 0
+        point.aux = 0
+        point.mcode = 0
+        payload = self._encode_point_to_register(point)
+        print("set_point_data {}: {}".format(point_numb, payload))
+        try:
+            self.client.write_registers(MB_REG.POINT_TABLE_OFFSET + point_numb, payload, unit=255)
+        except Exception as e:
+            print('set_point_data exception: %s' % e)
 
     def get_electronic_gear_ratio(self):
         data = utils.read(self.cli, index['MR_GEAR_RATIO'], 5)
@@ -434,7 +370,7 @@ class MR_JE_C:
             return False
 
     def get_mode(self):
-        result = self._read_int8_register(MB_REG.MODES_OPERATION_DISPLAY)
+        result = self._read_int8_register(MB_REG.MODE_OPERATION_DISPLAY)
         return result
 
     def home(self):
