@@ -44,22 +44,42 @@ def write ( ModbusTCPClient, index, word):
     else:
         return None
 
-# set a bit (or bits) in a word
-def set_bit( word, *bits) -> int:
+
+def set_bit( word, *bits):
+    # set a bit (or bits) in a word
     result = word
-    
     for bit in bits:
         result = result | bit
     return result
 
-# reset a bit (or bits) in a word
-def reset_bit( word, *bits) -> int:
+
+def reset_bit( word, *bits) :
+    # reset a bit (or bits) in a word
     mask = 0
     result = word
-    
     for bit in bits:
         mask = mask | bit
-    
     result = result & ~mask
-
     return result
+
+
+def set_bit_reg(register, bit):
+    register = register | (1 << bit)
+    return register
+
+
+def clear_bit_reg(register, bit):
+    register = register & ~(1 << bit)
+    return register
+
+
+def check_bit_set(register, bit):
+    if register & (1 << bit):
+        return True
+    return False
+
+
+def check_bits_register(register, bits):
+    if (register & bits) == bits:
+        return True
+    return False
