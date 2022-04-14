@@ -3,13 +3,12 @@ from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
 from pymodbus.constants import Endian
 import utils
 
-homing = {
-    'MR_HOME_INTERRUPTED': 0x400,
-    'MR_ILA': 0x800,
-    'MR_HOME_COMPLETED': 0x1400,  # bit 10 e 12
-    'MR_HOME_ERROR_SPEED': 0x2000,  # bit 13
-    'MR_HOME_ERROR_SPEED_0': 0x2400  # bit 10 e 13
-}
+class HOMING:
+    HOME_INTERRUPTED = 0x400
+    ILA = 0x800
+    HOME_COMPLETED = 0x1400     # bit 10 e 12
+    HOME_ERROR_SPEED = 0x2000   # bit 13
+    HOME_ERROR_SPEED_0 = 0x2400 # bit 10 e 13
 
 class MASK:
     BIT_0 = 0x0001
@@ -61,7 +60,7 @@ class MB_REG:
     DEVICE_INFO = 0x1018
     POINT_TABLE_OFFSET = 0x2801
     TARGET_POINT_TABLE = 0x2d60
-    PROF_ACELERATION = 0x6083
+    PROF_ACCELERATION = 0x6083
     PROF_DECELERATION = 0x6084
     QS_DECELERATION = 0x6085
     QS_OPTION_CODE = 0x605a
@@ -95,16 +94,14 @@ class CW_COMMANDS:
 
 class CW_BITS:
     # Control Word (6040) bit mapping.
-    # Bits 4 to 6 are mode specific bits, in this case PP mode.
+    # Bits 4 to 6 are mode specific bits, in this case PT (Point Table) mode.
     SO = 0  # Switch On
     EV = 1  # Enable Voltage
     QS = 2  # Quick Stop
     EO = 3  # Enable Operation
-    NEW_SET_POIT = 4  # New positioning parameters are obtained when this bit turns on
-    CHANGE_SET = 5  # 0: Set of set-points;  1: Single set-point
-    ABS_REL = 6  # 0: Absolut position command; 1: Relative position command
-    HALT = 8  # 0: Positioning is executed 1: The servo motor stops according to Halt option code (605Dh)
-    CHANGE_SET_POINT = 9  # 0: The next position start after the current position is completed. 1: Don´t stop
+    NEW_SET_POIT = 4        # New positioning parameters are obtained when this bit turns on
+    DIRECTION = 5           # 0: Set of set-points;  1: Single set-point
+    HALT = 8                # 0: Positioning is executed 1: The servo motor stops according to Halt option code (605Dh)
 
 
 class SW_STATES:
@@ -130,17 +127,17 @@ class SW_STATES:
 
 class SW_BITS:
     # Status Word bit mapping
-    RTSO = 0  # Ready to Switch On
-    SO = 1  # Switched On
-    OE = 2  # Operation Enabled
-    FAULT = 3  # Fault
-    VE = 4  # Voltage Enable
-    QS = 5  # Quick stop
-    SOD = 6  # Switch On Disabled
-    W = 7  # Warning
-    TR = 10  # Target reached
-    ILA = 11  # Internal limit active
-    SET_POINT_ACK = 12  # 0: Positioning completed; 1: Positioning being executed
+    RTSO = 0    # Ready to Switch On
+    SO = 1      # Switched On
+    OE = 2      # Operation Enabled
+    FAULT = 3   # Fault
+    VE = 4      # Voltage Enable
+    QS = 5      # Quick stop
+    SOD = 6     # Switch On Disabled
+    W = 7       # Warning
+    TR = 10     # Target reached
+    ILA = 11    # Internal limit active
+    SET_POINT_ACK = 12 # 0: Positioning completed; 1: Positioning being executed
     FOLLOW_ERROR = 13  # 0: No following error; 1: Following error
 
 
@@ -152,20 +149,16 @@ class PointData:
     deceleration = None
     dwell = None
     aux = None
-    mcode = None
+    mCode = None
 
 
 class MR_JE_C:
     def __init__(self, ip, port=502):
         self.client = ModbusTcpClient(ip, port)
-        self.gear_ratio = 0
-        self.gear_numerator = 0
-        self.gear_denominator = 0
-        self.mode = None
         self._open_com()
 
     def _open_com(self):
-        # Open modbus  Modbus TCP communication
+        # Open Modbus TCP communication
         try:
             result = self.client.connect()
             if result:
@@ -176,18 +169,37 @@ class MR_JE_C:
             print('open_com exception: %s' % e)
 
     def _read_float_register(self, address):
-        result = self.client.read_holding_registers(address, 2, unit=255)
-        value = BinaryPayloadDecoder.fromRegisters(result.registers,
-                                                   byteorder=Endian.Big,
-                                                   wordorder=Endian.Little).decode_32bit_float()
-        return ('%.3f' % value).rstrip('.')
+        try:
+            result = self.client.read_holding_registers(address, 2, unit=255)
+            value = BinaryPayloadDecoder.fromRegisters(result.registers,
+                                                       byteorder=Endian.Big,
+                                                       wordorder=Endian.Little).decode_32bit_float()
+            return ('%.3f' % value).rstrip('.')
+        except Exception as e:
+            print('_read_float_register exception: %s' % e)
+        return None
+
+    def _read_int32_register(self, address):
+        try:
+            result = self.client.read_holding_registers(address, 2, unit=255)
+            value = BinaryPayloadDecoder.fromRegisters(result.registers,
+                                                       byteorder=Endian.Big,
+                                                       wordorder=Endian.Little).decode_32bit_int()
+            return value
+        except Exception as e:
+            print('_read_int32_register exception: %s' % e)
+        return None
 
     def _read_register(self, address):
-        result = self.client.read_holding_registers(address, 1, unit=255)
-        value = BinaryPayloadDecoder.fromRegisters(result.registers,
-                                                   byteorder=Endian.Big,
-                                                   wordorder=Endian.Little).decode_16bit_uint()
-        return value
+        try:
+            result = self.client.read_holding_registers(address, 1, unit=255)
+            value = BinaryPayloadDecoder.fromRegisters(result.registers,
+                                                       byteorder=Endian.Big,
+                                                       wordorder=Endian.Little).decode_16bit_uint()
+            return value
+        except Exception as e:
+            print('_read_register exception: %s' % e)
+        return None
 
     def _read_int8_register(self, address):
         result = self.client.read_holding_registers(address, 1, unit=255)
@@ -197,11 +209,17 @@ class MR_JE_C:
         value.skip_bytes(1)
         return value.decode_8bit_int()
 
-    def _write_register(self, address, value):
-        result = self.client.write_registers(address, value, unit=255)
-        return result
+    def _write_registers(self, address, value):
+        try:
+            self.client.write_registers(address, value, unit=255)
+            return False
+        except Exception as e:
+            print('_write_register exception: %s' % e)
+        return True
 
-    def _decode_register_to_point(self, data):
+    @staticmethod
+    def _decode_register_to_point(data):
+        # Decodes the information from Modbus registers to a PointDada class
         _decoder = BinaryPayloadDecoder.fromRegisters(data.registers,
                                                       byteorder=Endian.Big,
                                                       wordorder=Endian.Little)
@@ -213,10 +231,11 @@ class MR_JE_C:
         point.deceleration = _decoder.decode_32bit_int()
         point.dwell = _decoder.decode_32bit_int()
         point.aux = _decoder.decode_32bit_int()
-        point.mcode = _decoder.decode_32bit_int()
+        point.mCode = _decoder.decode_32bit_int()
         return point
 
-    def _encode_point_to_register(self, point):
+    @staticmethod
+    def _encode_point_to_register(point):
         _payload = BinaryPayloadBuilder(byteorder=Endian.Big, wordorder=Endian.Little)
         _payload.add_16bit_uint(point.n_entries)
         _payload.add_32bit_int(point.point_data)
@@ -225,17 +244,20 @@ class MR_JE_C:
         _payload.add_32bit_int(point.deceleration)
         _payload.add_32bit_int(point.dwell)
         _payload.add_32bit_int(point.aux)
-        _payload.add_32bit_int(point.mcode)
+        _payload.add_32bit_int(point.mCode)
         return _payload.to_registers()
 
     def get_info(self):
         data = self.client.read_holding_registers(MB_REG.DEVICE_INFO, 9, unit=255)
-        print(data)
+        _decoder = BinaryPayloadDecoder.fromRegisters(data.registers,
+                                                      byteorder=Endian.Big,
+                                                      wordorder=Endian.Little)
         if data is not None:
-            print('Vendor ID        :' + str(hex(data.registers[1] | data.registers[2] << 16)))
-            print('Product Code     :' + str(hex(data.registers[3] | data.registers[4] << 16)))
-            print('Revision Number  :' + str(hex(data.registers[5] | data.registers[6] << 16)))
-            print('Serial number    :' + str(hex(data.registers[7] | data.registers[8] << 16)))
+            print('ID object      :{}'.format(_decoder.decode_16bit_uint()))
+            print('Vendor ID      :{}'.format(_decoder.decode_32bit_uint()))
+            print('Product Code   :{}'.format(_decoder.decode_32bit_uint()))
+            print('Revision Number:{}'.format(_decoder.decode_32bit_uint()))
+            print('Serial number  :{}'.format(_decoder.decode_32bit_uint()))
         else:
             print('No data - must check connection')
 
@@ -248,14 +270,12 @@ class MR_JE_C:
         return result
 
     def write_control_word(self, command):
-        return self._write_register(MB_REG.CONTROL_WORD, command)
+        return self._write_registers(MB_REG.CONTROL_WORD, command)
 
     def decode_status(self):
         status_word = self.get_status_word()
         print('STATUS_WORD: {:02b}'.format(status_word))
         status_word = status_word & 0x0F
-        print('STATUS_WORD: {:02b}'.format(status_word))
-
         if status_word == SW_STATES.NOT_READY_TO_SWITCH_ON:
             print("Not ready to switch on")
         if status_word == SW_STATES.SWITCH_ON_DISABLED:
@@ -274,42 +294,12 @@ class MR_JE_C:
             print("Fault ")
 
     def servo_on(self):
+        print("Servo On")
         self.write_control_word(CW_COMMANDS.ENABLE_OPERATION)
 
     def servo_off(self):
+        print("Servo Off")
         self.write_control_word(CW_COMMANDS.DISABLE_OPERATION)
-
-    def reset_bits(self, *bits):
-        mask = 0
-        result = self.get_control_word()
-        print('Before reset: ' + str(hex(result)))
-
-        for bit in bits:
-            mask = mask | bit
-
-        result = result & ~mask
-        print('After resets ' + str(hex(result)))
-        utils.write(self.cli, index['MR_CONTROL_WORD'], result)
-
-    def set_bits(self, *bits):
-        word = self.get_control_word()
-
-        if word is not None:
-            for bit in bits:
-                word = word | bit
-            self.cli.write(MR_CONTROL_WORD, word)
-            return True
-        else:
-            return False
-
-    def get_actual_position(self):
-        words = utils.read(self.cli, index['MR_POSITION_ACTUAL_VALUE'], 2)
-        if words is not None:
-            decode = BinaryPayloadDecoder.fromRegisters(words.registers, byteorder=Endian.Big, wordorder=Endian.Little)
-            position = decode.decode_32bit_int()
-            return position
-        else:
-            return None
 
     def get_point_data(self, point_numb):
         # get point table data
@@ -324,6 +314,7 @@ class MR_JE_C:
 
         if data is not None:
             point = self._decode_register_to_point(data)
+
             return point
         else:
             return None
@@ -331,7 +322,7 @@ class MR_JE_C:
     def set_point_data(self, point_numb, cord, speed, accel, decel):
         # Set point table data
         point = PointData()
-        if point_numb < 0 or point_numb > 255:
+        if point_numb < 1 or point_numb > 255:
             return None
         point.n_entries = 7
         point.point_data = cord
@@ -340,13 +331,10 @@ class MR_JE_C:
         point.deceleration = decel
         point.dwell = 0
         point.aux = 0
-        point.mcode = 0
+        point.mCode = 0
         payload = self._encode_point_to_register(point)
         print("set_point_data {}: {}".format(point_numb, payload))
-        try:
-            self.client.write_registers(MB_REG.POINT_TABLE_OFFSET + point_numb, payload, unit=255)
-        except Exception as e:
-            print('set_point_data exception: %s' % e)
+        self._write_registers(MB_REG.POINT_TABLE_OFFSET + (point_numb - 1), payload)
 
     def get_electronic_gear_ratio(self):
         data = utils.read(self.cli, index['MR_GEAR_RATIO'], 5)
@@ -360,55 +348,44 @@ class MR_JE_C:
             return None
 
     def set_mode(self, mode):
-        if mode in modes.keys():
-            status = utils.write(self.cli, index['MR_MODE_OF_OPERATION'], modes[mode])
-            if status is None:
-                return False
-            else:
-                return True
-        else:
-            return False
+        self._write_registers(MB_REG.MODE_OF_OPERATION, mode)
 
     def get_mode(self):
         result = self._read_int8_register(MB_REG.MODE_OPERATION_DISPLAY)
         return result
 
+    def get_home_method(self):
+        result = self._read_register(MB_REG.HOMING_METHOD)
+        print(result)
+
     def home(self):
         mode = self.get_mode()
-        if mode is None:
-            return False
-        elif mode is not modes['MR_HOME_MODE']:
-            self.set_mode('MR_HOME_MODE')
+        if mode is not OP_MODES.HOME_MODE:
+            self.set_mode(OP_MODES.HOME_MODE)
 
-        self.set_bits(bits['BIT_4'])
-
+        control_word = self.get_control_word()
+        control_word = utils.set_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
         # send bit 4 set to start home
-
-        status_word = self.get_status_word()
-
+        self.write_control_word(control_word)
+        result = False
         while True:
-            if (status_word & homing['MR_HOME_COMPLETED']) is homing['MR_HOME_COMPLETED']:
-                retorno = True
-                break
-
-            elif (status_word & homing['MR_HOME_ERROR_SPEED_0']) is homing['MR_HOME_ERROR_SPEED_0'] or \
-                    (status_word & homing['MR_HOME_ERROR_SPEED']) is homing['MR_HOME_ERROR_SPEED'] or \
-                    (status_word & homing['MR_HOME_INTERRUPTED']) is homing['MR_HOME_INTERRUPTED']:
-                retorno = False
-                break
-
             status_word = self.get_status_word()
-            print('status word' + str(hex(status_word)))
+            if (status_word & HOMING.HOME_COMPLETED) == HOMING.HOME_COMPLETED:
+                result = True
+                break
+        # send bit 4 clear to stop home
+        control_word = utils.clear_bit_reg(control_word,CW_BITS.NEW_SET_POIT)
+        self.write_control_word(control_word)
+        return result
 
-        self.reset_bits(bits['BIT_4'])
+    def execute_point(self, point_numb):
+        # Set point
+        self._write_registers(MB_REG.TARGET_POINT_TABLE, point_numb)
 
-        return retorno
-
-    def reset(self):
-        status = self.get_control_word()
-        if status is not None:
-            self.set_bits(bits['BIT_7'])
-            ret = self.get_control_word()
-            if (ret & bits['BIT_7']) is bits['BIT_7']:
-                self.reset_bits(bits['BIT_7'])
-
+        # Execute moviment
+        control_word = self.get_control_word()
+        control_word = utils.set_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
+        self.write_control_word(control_word)
+        
+    def get_actual_position(self):
+        return self._read_int32_register(MB_REG.ACTUAL_POSITION)
