@@ -1,3 +1,5 @@
+import time
+
 from pymodbus.client.sync import *
 from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
 from pymodbus.constants import Endian
@@ -44,7 +46,7 @@ class OP_MODES:
     SPEED_CONTROL_MODE = -21
     TORQUE_CONTROL_MODE = -22
     JOG_MODE = -100
-    POINT_TABLE_MODE = -101
+    POINT_TABLE_MODE = 155 #(=-101)
     INDEXER_MODE = -103
 
 
@@ -79,7 +81,6 @@ class MB_REG:
     ACTUAL_POSITION = 0x6064
     ACTUAL_VELOCITY = 0x606C
     ACTUAL_TORQUE = 0x6077
-
 
 class CW_COMMANDS:
     # Control Word Commands, manual page 5-4
@@ -307,7 +308,7 @@ class MR_JE_C:
         if point_numb < 0 or point_numb > 255:
             return None
         try:
-            data = self.client.read_holding_registers(MB_REG.POINT_TABLE_OFFSET + point_numb, 15, unit=255)
+            data = self.client.read_holding_registers(MB_REG.POINT_TABLE_OFFSET + (point_numb - 1), 15, unit=255)
             print("get_poit_data {}: {}".format(point_numb, data.registers))
         except Exception as e:
             print('get_point_data exception: %s' % e)
@@ -385,7 +386,18 @@ class MR_JE_C:
         # Execute moviment
         control_word = self.get_control_word()
         control_word = utils.set_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
+        print("control_word: {:016b}".format(control_word))
         self.write_control_word(control_word)
-        
+
+        time.sleep(0.3)
+
+        control_word = self.get_control_word()
+        control_word = utils.clear_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
+        print("control_word: {:016b}".format(control_word))
+        self.write_control_word(control_word)
+
     def get_actual_position(self):
         return self._read_int32_register(MB_REG.ACTUAL_POSITION)
+
+    def get_point_actual_value(self):
+        return self._read_int32_register(MB_REG.POINT_ACTUAL_VALUE)
