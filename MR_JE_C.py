@@ -1,5 +1,5 @@
 from pymodbus.client.sync import *
-from pymodbus.payload import BinaryPayloadDecoder
+from pymodbus.payload import BinaryPayloadDecoder, BinaryPayloadBuilder
 from pymodbus.constants import Endian
 import utils
 
@@ -193,7 +193,10 @@ class MR_JE_C:
 
     def set_mode(self, mode):
         if mode in modes.keys():
-            status = utils.write( self.cli, index['MR_MODE_OF_OPERATION'],  modes[mode] )
+            _payload = BinaryPayloadBuilder( byteorder=Endian.Big, wordorder=Endian.Little)
+            _payload.add_8bit_int( 0 )
+            _payload.add_8bit_int( modes[mode] )
+            status = utils.write( self.cli, index['MR_MODE_OF_OPERATION'],  _payload)
             
             if status is None:
                 return False
