@@ -18,13 +18,13 @@ J2.servo_on()
 
 time.sleep(0.5)
 
-J1.set_point_data(1, 9000, 10000, 100, 100)
-J1.set_point_data(2, 13500, 10000, 100, 100)
-J1.set_point_data(3, 0, 10000, 100, 100)
+J1.set_point_data(1, 9000,  80000, 100, 100)
+J1.set_point_data(2, 13500, 26700, 100, 100)
+J1.set_point_data(3, 0,     40000, 100, 100)
 
-J2.set_point_data(1, 0, 10000, 100, 100)
-J2.set_point_data(2, 5000, 10000, 100, 100)
-J2.set_point_data(3, -5000, 10000, 100, 100)
+J2.set_point_data(1, 0,     72000, 100, 100)
+J2.set_point_data(2, 5000,  36000, 100, 100)
+J2.set_point_data(3, -5000, 72000, 100, 100)
 
 #J1.home()
 #print("Act position J1: {}".formtat(J2.get_actual_position()))
@@ -38,12 +38,13 @@ print("Mode J2: {}".format(J2.get_mode()))
 
 
 while True:
-    J1.execute_point(1)
+    J1.execute_point(2)
     J2.execute_point(2)
     time.sleep(2)
-    J1.execute_point(2)
+    J1.execute_point(3)
+    J2.execute_point(3)
+    time.sleep(2)
+    J1.execute_point(1)
     J2.execute_point(1)
     time.sleep(2)
-    #J1.execute_point(3)
-    #time.sleep(2)
 

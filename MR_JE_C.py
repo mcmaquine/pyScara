@@ -338,7 +338,10 @@ class MR_JE_C:
         self._write_registers(MB_REG.POINT_TABLE_OFFSET + (point_numb - 1), payload)
 
     def get_electronic_gear_ratio(self):
-        data = utils.read(self.cli, index['MR_GEAR_RATIO'], 5)
+        # Get Gear Ratio oncfigured o MR Configurator
+        # This data is important to know about servo parametrization
+        # related to mechanics
+        data = utils.read(self.cli, MB_REG.gear_ratio, 5)
         if data is not None:
             self.gear_ratio = data.registers[0]
             self.gear_numerator = data.registers[1] | data.registers[2] << 16
@@ -386,14 +389,14 @@ class MR_JE_C:
         # Execute moviment
         control_word = self.get_control_word()
         control_word = utils.set_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
-        print("control_word: {:016b}".format(control_word))
+        #print("control_word: {:016b}".format(control_word))
         self.write_control_word(control_word)
 
-        time.sleep(0.3)
+        #time.sleep(0.3)
 
         control_word = self.get_control_word()
         control_word = utils.clear_bit_reg(control_word, CW_BITS.NEW_SET_POIT)
-        print("control_word: {:016b}".format(control_word))
+        #print("control_word: {:016b}".format(control_word))
         self.write_control_word(control_word)
 
     def get_actual_position(self):
